@@ -55,12 +55,13 @@ jobs:
         run: |
           mkdir -p tests
           if [ ! -f tests/example.spec.js ]; then
+            # Try to copy any existing JS files
             cp -f *.js tests/ 2>/dev/null || true
+            
             # If no JS files copied, create a basic test file
             if [ ! "$(ls -A tests)" ]; then
-              cat > tests/example.spec.js << 'EOF'
-              $(cat paste.txt 2>/dev/null || echo "// Using test code from the uploaded file")
-EOF
+              echo "// Test file created from workflow" > tests/example.spec.js
+              cat paste.txt >> tests/example.spec.js 2>/dev/null || echo "// Using basic test structure" >> tests/example.spec.js
             fi
           fi
       
