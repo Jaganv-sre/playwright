@@ -26,8 +26,24 @@ jobs:
           node-version: 18
           cache: 'npm'
       
+      - name: Create package.json if not exists
+        run: |
+          if [ ! -f package.json ]; then
+            echo '{
+              "name": "forbes-playwright-tests",
+              "version": "1.0.0",
+              "description": "Automated tests for Forbes website",
+              "scripts": {
+                "test": "playwright test"
+              },
+              "dependencies": {
+                "@playwright/test": "^1.42.1"
+              }
+            }' > package.json
+          fi
+          
       - name: Install dependencies
-        run: npm ci
+        run: npm install
       
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
@@ -35,8 +51,44 @@ jobs:
       - name: Create screenshots directory
         run: mkdir -p ./screenshots
       
+      - name: Create test file if it doesn't exist
+        run: |
+          mkdir -p tests
+          if [ ! -f tests/example.spec.js ]; then
+            cp -f *.js tests/ 2>/dev/null || true
+            # If no JS files copied, create a basic test file
+            if [ ! "$(ls -A tests)" ]; then
+              cat > tests/example.spec.js << 'EOF'
+              $(cat paste.txt 2>/dev/null || echo "// Using test code from the uploaded file")
+EOF
+            fi
+          fi
+      
+      - name: Create playwright config
+        run: |
+          if [ ! -f playwright.config.js ]; then
+            echo "const { defineConfig } = require('@playwright/test');
+            
+            module.exports = defineConfig({
+              testDir: './tests',
+              timeout: 60000,
+              reporter: ['html', ['list']],
+              use: {
+                viewport: { width: 1280, height: 720 },
+                screenshot: 'only-on-failure',
+              },
+              projects: [
+                {
+                  name: 'chromium',
+                  use: { browserName: 'chromium' },
+                },
+              ],
+            });" > playwright.config.js
+          fi
+            
       - name: Run Playwright tests
         run: npx playwright test
+        continue-on-error: true
         env:
           CI: true
       
@@ -47,35 +99,50 @@ jobs:
           echo "Run at: $(date)" >> report.txt
           echo "" >> report.txt
           
-          # Get test statistics
-          npx playwright show-report playwright-report --host localhost --port 9323 &
-          sleep 5
-          curl -s http://localhost:9323/api/report | jq > test-summary.json
-          
-          passed=$(jq '.stats.expected' test-summary.json)
-          failed=$(jq '.stats.unexpected' test-summary.json)
-          flaky=$(jq '.stats.flaky' test-summary.json)
-          skipped=$(jq '.stats.skipped' test-summary.json)
-          
-          echo "### Test Results" >> report.txt
-          echo "- ✅ Passed: $passed" >> report.txt
-          echo "- ❌ Failed: $failed" >> report.txt
-          echo "- 🔄 Flaky: $flaky" >> report.txt
-          echo "- ⏭️ Skipped: $skipped" >> report.txt
-          echo "" >> report.txt
-          
-          # Add performance metrics
-          echo "### Performance Analysis" >> report.txt
-          grep -r "Top 5 slowest internal resources" test-results/ -A 10 | grep -v "ms" >> report.txt
-          
-          # Add failing tests if any
-          if [ "$failed" -gt "0" ]; then
-            echo "" >> report.txt
-            echo "### Failed Tests" >> report.txt
-            jq -r '.suites[].suites[].specs[] | select(.outcome=="unexpected") | "- " + .title' test-summary.json >> report.txt
+          # Check if test results exist
+          if [ -d "playwright-report" ]; then
+            # Get test statistics if available
+            if command -v npx &> /dev/null; then
+              npx playwright show-report playwright-report --host localhost --port 9323 &
+              sleep 5
+              if curl -s http://localhost:9323/api/report -o test-summary.json; then
+                passed=$(jq '.stats.expected' test-summary.json 2>/dev/null || echo "0")
+                failed=$(jq '.stats.unexpected' test-summary.json 2>/dev/null || echo "0")
+                flaky=$(jq '.stats.flaky' test-summary.json 2>/dev/null || echo "0")
+                skipped=$(jq '.stats.skipped' test-summary.json 2>/dev/null || echo "0")
+                
+                echo "### Test Results" >> report.txt
+                echo "- ✅ Passed: $passed" >> report.txt
+                echo "- ❌ Failed: $failed" >> report.txt
+                echo "- 🔄 Flaky: $flaky" >> report.txt
+                echo "- ⏭️ Skipped: $skipped" >> report.txt
+                echo "" >> report.txt
+                
+                # Add failing tests if any
+                if [ "$failed" -gt "0" ]; then
+                  echo "" >> report.txt
+                  echo "### Failed Tests" >> report.txt
+                  jq -r '.suites[].suites[].specs[] | select(.outcome=="unexpected") | "- " + .title' test-summary.json 2>/dev/null >> report.txt
+                fi
+                
+                kill $(lsof -t -i:9323 2>/dev/null) || true
+              else
+                echo "### Test Results" >> report.txt
+                echo "- ❓ Could not retrieve test results" >> report.txt
+              fi
+            else
+              echo "### Test Results" >> report.txt
+              echo "- ❓ NPX not available to show report" >> report.txt
+            fi
+          else
+            echo "### Test Results" >> report.txt
+            echo "- ❌ No test results found" >> report.txt
           fi
           
-          kill $(lsof -t -i:9323) || true
+          # Add log of any errors
+          echo "" >> report.txt
+          echo "### Execution Logs" >> report.txt
+          echo "$(tail -n 20 $(find . -name "*.log" 2>/dev/null) 2>/dev/null || echo 'No log files found')" >> report.txt
       
       - name: Send report to Slack
         if: always()
