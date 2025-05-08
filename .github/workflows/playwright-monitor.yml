@@ -1,45 +1,93 @@
-name: Run Playwright Monitoring
+name: Hourly Playwright Tests
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs every hour
+    # Run every hour
+    - cron: '0 * * * *'
   workflow_dispatch:
+    # Allow manual triggering
 
 jobs:
-  run-playwright-tests:
+  test:
+    name: Run Playwright Tests
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-
+      
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-
+          cache: 'npm'
+      
       - name: Install dependencies
-        run: |
-          npm ci
-          npx playwright install
-
-      - name: Run Playwright Test
-        run: |
-          # Run Playwright tests, ensuring the necessary environment file is available
-          node your_playwright_script.js > result.log || true
-
-      - name: Upload Screenshots
-        if: success()  # Only upload if tests pass
+        run: npm ci
+      
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: Create screenshots directory
+        run: mkdir -p ./screenshots
+      
+      - name: Run Playwright tests
+        run: npx playwright test
+        env:
+          CI: true
+      
+      - name: Upload test results
+        if: always()
         uses: actions/upload-artifact@v3
         with:
-          name: playwright-screenshots
-          path: ./screenshots
-
-      - name: Send Report to Slack
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          name: playwright-results
+          path: |
+            playwright-report/
+            test-results/
+            screenshots/
+          retention-days: 7
+      
+      - name: Generate performance report
+        if: always()
         run: |
-          STATUS=$(tail -n 20 result.log)
-          curl -X POST -H 'Content-type: application/json' \
-          --data "{\"text\":\"*Playwright Monitoring Report*\n\`\`\`${STATUS}\`\`\`\"}" \
-          $SLACK_WEBHOOK_URL
+          echo "## Performance Report" > performance-report.md
+          echo "Generated on $(date)" >> performance-report.md
+          echo "### Test Results" >> performance-report.md
+          npx playwright show-report playwright-report --host localhost --port 9323 &
+          sleep 5
+          curl -s http://localhost:9323/api/report | jq > test-summary.json
+          passed=$(jq '.stats.expected' test-summary.json)
+          failed=$(jq '.stats.unexpected' test-summary.json)
+          flaky=$(jq '.stats.flaky' test-summary.json)
+          skipped=$(jq '.stats.skipped' test-summary.json)
+          echo "- Passed: $passed" >> performance-report.md
+          echo "- Failed: $failed" >> performance-report.md
+          echo "- Flaky: $flaky" >> performance-report.md
+          echo "- Skipped: $skipped" >> performance-report.md
+          kill $(lsof -t -i:9323) || true
+      
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-report
+          path: performance-report.md
+          retention-days: 7
+      
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { repo, owner } = context.repo;
+            const run_id = context.runId;
+            const run_number = context.runNumber;
+            const workflow = context.workflow;
+            const job = context.job;
+            
+            await github.rest.issues.create({
+              owner,
+              repo,
+              title: `❌ Playwright Test Failure - Run #${run_number}`,
+              body: `Hourly Playwright tests failed at ${new Date().toISOString()}\n\nWorkflow: ${workflow}\nJob: ${job}\nRun ID: ${run_id}\nRun Number: ${run_number}\n\n[View Run](https://github.com/${owner}/${repo}/actions/runs/${run_id})`
+            });
