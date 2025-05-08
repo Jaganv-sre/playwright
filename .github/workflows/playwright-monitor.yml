@@ -1,37 +1,36 @@
 name: Run Playwright Tests Hourly
 
 on:
-    schedule:
-          - cron: '0 * * * *' # Every hour
-              workflow_dispatch: # Allows manual run
+  schedule:
+    - cron: '0 * * * *' # Every hour
+  workflow_dispatch: # Allows manual run
 
-              jobs:
-                  test:
-                        runs-on: ubuntu-latest
-                              steps:
-                                      - name: Checkout repo
-                                                uses: actions/checkout@v3
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-                                                        - name: Set up Node
-                                                                  uses: actions/setup-node@v3
-                                                                            with:
-                                                                                        node-version: 20
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
 
-                                                                                                - name: Install dependencies
-                                                                                                          run: |
-                                                                                                                      npm install
-                                                                                                                                npx playwright install --with-deps
+      - name: Install dependencies
+        run: |
+          npm install
+          npx playwright install --with-deps
 
-                                                                                                                                      - name: Run Playwright Tests
-                                                                                                                                                run: npx playwright test --reporter=list > result.log
+      - name: Run Playwright Tests
+        run: npx playwright test --reporter=list > result.log
 
-                                                                                                                                                        - name: Send Report to Slack
-                                                                                                                                                                  if: always()
-                                                                                                                                                                            env:
-                                                                                                                                                                                        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-                                                                                                                                                                                                  run: |
-                                                                                                                                                                                                              STATUS=$(tail -n 20 result.log)
-                                                                                                                                                                                                                        curl -X POST -H 'Content-type: application/json' \
-                                                                                                                                                                                                                                      --data "{\"text\":\"📊 *Playwright Report*\n\`\`\`${STATUS}\`\`\`\"}" \
-                                                                                                                                                                                                                                                          $SLACK_WEBHOOK_URL
-
+      - name: Send Report to Slack
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          STATUS=$(tail -n 20 result.log)
+          curl -X POST -H 'Content-type: application/json' \
+            --data "{\"text\":\"📊 *Playwright Report*\n\`\`\`${STATUS}\`\`\`\"}" \
+            $SLACK_WEBHOOK_URL
