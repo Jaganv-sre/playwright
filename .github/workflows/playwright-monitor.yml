@@ -7,6 +7,10 @@ on:
   workflow_dispatch:
     # Allow manual triggering
 
+# Define environment variables
+env:
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
 jobs:
   test:
     name: Run Playwright Tests
@@ -36,58 +40,83 @@ jobs:
         env:
           CI: true
       
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          name: playwright-results
-          path: |
-            playwright-report/
-            test-results/
-            screenshots/
-          retention-days: 7
-      
-      - name: Generate performance report
+      - name: Generate test report summary
         if: always()
         run: |
-          echo "## Performance Report" > performance-report.md
-          echo "Generated on $(date)" >> performance-report.md
-          echo "### Test Results" >> performance-report.md
+          echo "## Forbes Website Test Report" > report.txt
+          echo "Run at: $(date)" >> report.txt
+          echo "" >> report.txt
+          
+          # Get test statistics
           npx playwright show-report playwright-report --host localhost --port 9323 &
           sleep 5
           curl -s http://localhost:9323/api/report | jq > test-summary.json
+          
           passed=$(jq '.stats.expected' test-summary.json)
           failed=$(jq '.stats.unexpected' test-summary.json)
           flaky=$(jq '.stats.flaky' test-summary.json)
           skipped=$(jq '.stats.skipped' test-summary.json)
-          echo "- Passed: $passed" >> performance-report.md
-          echo "- Failed: $failed" >> performance-report.md
-          echo "- Flaky: $flaky" >> performance-report.md
-          echo "- Skipped: $skipped" >> performance-report.md
+          
+          echo "### Test Results" >> report.txt
+          echo "- ✅ Passed: $passed" >> report.txt
+          echo "- ❌ Failed: $failed" >> report.txt
+          echo "- 🔄 Flaky: $flaky" >> report.txt
+          echo "- ⏭️ Skipped: $skipped" >> report.txt
+          echo "" >> report.txt
+          
+          # Add performance metrics
+          echo "### Performance Analysis" >> report.txt
+          grep -r "Top 5 slowest internal resources" test-results/ -A 10 | grep -v "ms" >> report.txt
+          
+          # Add failing tests if any
+          if [ "$failed" -gt "0" ]; then
+            echo "" >> report.txt
+            echo "### Failed Tests" >> report.txt
+            jq -r '.suites[].suites[].specs[] | select(.outcome=="unexpected") | "- " + .title' test-summary.json >> report.txt
+          fi
+          
           kill $(lsof -t -i:9323) || true
       
-      - name: Upload performance report
+      - name: Send report to Slack
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: slackapi/slack-github-action@v1.23.0
         with:
-          name: performance-report
-          path: performance-report.md
-          retention-days: 7
-      
-      - name: Notify on failure
-        if: failure()
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const { repo, owner } = context.repo;
-            const run_id = context.runId;
-            const run_number = context.runNumber;
-            const workflow = context.workflow;
-            const job = context.job;
-            
-            await github.rest.issues.create({
-              owner,
-              repo,
-              title: `❌ Playwright Test Failure - Run #${run_number}`,
-              body: `Hourly Playwright tests failed at ${new Date().toISOString()}\n\nWorkflow: ${workflow}\nJob: ${job}\nRun ID: ${run_id}\nRun Number: ${run_number}\n\n[View Run](https://github.com/${owner}/${repo}/actions/runs/${run_id})`
-            });
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "Forbes Website Test Results",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Run Summary:* ${{ job.status == 'success' && '✅ All tests passed' || '❌ Some tests failed' }}\n*Date:* $(date)"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "```$(cat report.txt)```"
+                  }
+                },
+                {
+                  "type": "context",
+                  "elements": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
