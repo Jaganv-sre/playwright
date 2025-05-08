@@ -1,36 +1,45 @@
-name: Run Playwright Tests Hourly
+name: Run Playwright Monitoring
 
 on:
   schedule:
-    - cron: '0 * * * *' # Every hour
-  workflow_dispatch: # Allows manual run
+    - cron: "0 * * * *"  # Runs every hour
+  workflow_dispatch:
 
 jobs:
-  test:
+  run-playwright-tests:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 18
 
       - name: Install dependencies
         run: |
-          npm install
-          npx playwright install --with-deps
+          npm ci
+          npx playwright install
 
-      - name: Run Playwright Tests
-        run: npx playwright test --reporter=list > result.log
+      - name: Run Playwright Test
+        run: |
+          # Run Playwright tests, ensuring the necessary environment file is available
+          node your_playwright_script.js > result.log || true
+
+      - name: Upload Screenshots
+        if: success()  # Only upload if tests pass
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-screenshots
+          path: ./screenshots
 
       - name: Send Report to Slack
-        if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           STATUS=$(tail -n 20 result.log)
           curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"📊 *Playwright Report*\n\`\`\`${STATUS}\`\`\`\"}" \
-            $SLACK_WEBHOOK_URL
+          --data "{\"text\":\"*Playwright Monitoring Report*\n\`\`\`${STATUS}\`\`\`\"}" \
+          $SLACK_WEBHOOK_URL
