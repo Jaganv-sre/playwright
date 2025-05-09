@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies and browsers
+      - name: Install dependencies and Chromium only
         run: |
           npm install
           npx playwright install chromium
@@ -60,20 +60,22 @@ jobs:
         with:
           path: all-reports
 
-      - name: Merge all status messages
+      - name: Merge status into file
         run: |
           find all-reports -type f -name "combined-status.txt" -exec cat {} \; > full-status.txt
 
       - name: Zip all reports
         run: zip -r site-reports.zip all-reports
 
-      - name: Send Slack Message (curl)
+      - name: Send Slack Message (safe JSON)
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          TEXT=$(cat full-status.txt | jq -Rs .)
+          ESCAPED=$(jq -Rs . < full-status.txt)
+          echo "{\"text\": $ESCAPED}" > slack-payload.json
+
           curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\": \"📊 *Playwright Site Check Summary*\n\n$TEXT\"}" \
+            --data @slack-payload.json \
             $SLACK_WEBHOOK_URL
 
       - name: Upload ZIP file to Slack
