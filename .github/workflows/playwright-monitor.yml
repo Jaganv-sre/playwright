@@ -63,6 +63,8 @@ jobs:
       - name: Merge status into file
         run: |
           find all-reports -type f -name "combined-status.txt" -exec cat {} \; > full-status.txt
+          echo "✅ Final Merged Status Output:"
+          cat full-status.txt
 
       - name: Zip all reports
         run: zip -r site-reports.zip all-reports
