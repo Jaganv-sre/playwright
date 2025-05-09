@@ -1,0 +1,25 @@
+{
+  "name": "playwright",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test sites"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.43.1",
+    "@types/node": "^22.14.0",
+    "playwright": "^1.51.1"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "playwright-core": "^1.51.1",
+    "undici-types": "^6.21.0"
+  },
+  "description": ""
+}
