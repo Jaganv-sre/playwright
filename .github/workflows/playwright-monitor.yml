@@ -1,190 +1,109 @@
-name: Hourly Playwright Tests
+name: Playwright Site Status
 
 on:
   schedule:
-    # Run every hour
-    - cron: '0 * * * *'
+    - cron: "0 */3 * * *"
   workflow_dispatch:
-    # Allow manual triggering
-
-# Define environment variables
-env:
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 jobs:
-  test:
-    name: Run Playwright Tests
+  site-check:
     runs-on: ubuntu-latest
-    
+    strategy:
+      matrix:
+        site: [ca,au]
+
+    env:
+      NODE_ENV: production
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
-      - name: Setup Node.js
+
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
-          cache: 'npm'
-      
-      - name: Create package.json if not exists
-        run: |
-          if [ ! -f package.json ]; then
-            echo '{
-              "name": "forbes-playwright-tests",
-              "version": "1.0.0",
-              "description": "Automated tests for Forbes website",
-              "scripts": {
-                "test": "playwright test"
-              },
-              "dependencies": {
-                "@playwright/test": "^1.42.1"
-              }
-            }' > package.json
-          fi
-          
+
       - name: Install dependencies
-        run: npm install
-      
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-      
-      - name: Create screenshots directory
-        run: mkdir -p ./screenshots
-      
-      - name: Create test file if it doesn't exist
-        run: |
-          mkdir -p tests
-          if [ ! -f tests/example.spec.js ]; then
-            # Try to copy any existing JS files
-            cp -f *.js tests/ 2>/dev/null || true
-            
-            # If no JS files copied, create a basic test file
-            if [ ! "$(ls -A tests)" ]; then
-              echo "// Test file created from workflow" > tests/example.spec.js
-              cat paste.txt >> tests/example.spec.js 2>/dev/null || echo "// Using basic test structure" >> tests/example.spec.js
-            fi
-          fi
-      
-      - name: Create playwright config
-        run: |
-          if [ ! -f playwright.config.js ]; then
-            echo "const { defineConfig } = require('@playwright/test');
-            
-            module.exports = defineConfig({
-              testDir: './tests',
-              timeout: 60000,
-              reporter: ['html', ['list']],
-              use: {
-                viewport: { width: 1280, height: 720 },
-                screenshot: 'only-on-failure',
-              },
-              projects: [
-                {
-                  name: 'chromium',
-                  use: { browserName: 'chromium' },
-                },
-              ],
-            });" > playwright.config.js
-          fi
-            
-      - name: Run Playwright tests
-        run: npx playwright test
-        continue-on-error: true
+        run: npm ci
         env:
-          CI: true
-      
-      - name: Generate test report summary
-        if: always()
+          NODE_ENV: development
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests for ${{ matrix.site }}
         run: |
-          echo "## Forbes Website Test Report" > report.txt
-          echo "Run at: $(date)" >> report.txt
-          echo "" >> report.txt
-          
-          # Check if test results exist
-          if [ -d "playwright-report" ]; then
-            # Get test statistics if available
-            if command -v npx &> /dev/null; then
-              npx playwright show-report playwright-report --host localhost --port 9323 &
-              sleep 5
-              if curl -s http://localhost:9323/api/report -o test-summary.json; then
-                passed=$(jq '.stats.expected' test-summary.json 2>/dev/null || echo "0")
-                failed=$(jq '.stats.unexpected' test-summary.json 2>/dev/null || echo "0")
-                flaky=$(jq '.stats.flaky' test-summary.json 2>/dev/null || echo "0")
-                skipped=$(jq '.stats.skipped' test-summary.json 2>/dev/null || echo "0")
-                
-                echo "### Test Results" >> report.txt
-                echo "- ✅ Passed: $passed" >> report.txt
-                echo "- ❌ Failed: $failed" >> report.txt
-                echo "- 🔄 Flaky: $flaky" >> report.txt
-                echo "- ⏭️ Skipped: $skipped" >> report.txt
-                echo "" >> report.txt
-                
-                # Add failing tests if any
-                if [ "$failed" -gt "0" ]; then
-                  echo "" >> report.txt
-                  echo "### Failed Tests" >> report.txt
-                  jq -r '.suites[].suites[].specs[] | select(.outcome=="unexpected") | "- " + .title' test-summary.json 2>/dev/null >> report.txt
-                fi
-                
-                kill $(lsof -t -i:9323 2>/dev/null) || true
-              else
-                echo "### Test Results" >> report.txt
-                echo "- ❓ Could not retrieve test results" >> report.txt
-              fi
-            else
-              echo "### Test Results" >> report.txt
-              echo "- ❓ NPX not available to show report" >> report.txt
-            fi
+          SITE=${{ matrix.site }}
+          SITE_UPPER=$(echo "$SITE" | tr '[:lower:]' '[:upper:]')
+          mkdir -p reports/$SITE
+          if npx playwright test sites/${SITE}.spec.ts --reporter=html --output=reports/$SITE; then
+            echo "$SITE_UPPER status is good" > reports/$SITE/combined-status.txt
           else
-            echo "### Test Results" >> report.txt
-            echo "- ❌ No test results found" >> report.txt
+            echo "$SITE_UPPER check failed" > reports/$SITE/combined-status.txt
           fi
-          
-          # Add log of any errors
-          echo "" >> report.txt
-          echo "### Execution Logs" >> report.txt
-          echo "$(tail -n 20 $(find . -name "*.log" 2>/dev/null) 2>/dev/null || echo 'No log files found')" >> report.txt
-      
-      - name: Send report to Slack
-        if: always()
-        uses: slackapi/slack-github-action@v1.23.0
+
+      - name: Upload site report
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.site }}
+          path: reports/${{ matrix.site }}
+
+      - name: Upload site status
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
+
+  notify:
+    needs: site-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+
+      - name: Merge status messages
+        id: merge_status
+        run: |
+          STATUS_FILE="combined-status.txt"
+          touch $STATUS_FILE
+          find all-reports -type f -name "combined-status.txt" -exec cat {} \; >> $STATUS_FILE
+          echo "status_message<<EOF" >> $GITHUB_OUTPUT
+          cat $STATUS_FILE >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Zip all reports
+        run: zip -r site-reports.zip all-reports
+
+      - name: Read combined status safely
+        id: read_status
+        run: |
+          if [ -f combined-status.txt ]; then
+            RAW_STATUS=$(cat combined-status.txt)
+            ESCAPED_STATUS=$(printf "%s" "$RAW_STATUS" | jq -Rs .)
+            echo "status_message=$ESCAPED_STATUS" >> $GITHUB_OUTPUT
+          else
+            echo "status_message=\"No site status available.\"" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send status to Slack
+        uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": "Forbes Website Test Results",
-                    "emoji": true
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "*Run Summary:* ${{ job.status == 'success' && '✅ All tests passed' || '❌ Some tests failed' }}\n*Date:* $(date)"
-                  }
-                },
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "```$(cat report.txt)```"
-                  }
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
+              "text": "*Site Audit Completed*\n\n${{ steps.read_status.outputs.status_message }}"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+      - name: Upload ZIP file to Slack
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        run: |
+          curl -F file=@site-reports.zip \
+               -F "initial_comment= Full Site Reports" \
+               -F channels=#your-channel-name \
+               -H "Authorization: Bearer $SLACK_TOKEN" \
+               https://slack.com/api/files.upload
