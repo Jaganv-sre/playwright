@@ -10,25 +10,42 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU, Ca]  # removed .spec.ts extension
-
-    env:
-      NODE_ENV: production
+        site: [AU, Ca]
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
+      - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Check Node.js version
-        run: node -v
+      - name: Check Node.js and npm version
+        run: |
+          node -v
+          npm -v
 
       - name: Install dependencies
         run: |
+          echo "Checking if package.json exists..."
+          if [ ! -f "package.json" ]; then
+            echo "Creating a minimal package.json"
+            cat <<EOF > package.json
+            {
+              "name": "playwright-monitor",
+              "version": "1.0.0",
+              "scripts": {
+                "test": "playwright test"
+              },
+              "devDependencies": {
+                "@playwright/test": "^1.42.1",
+                "typescript": "^5.3.3"
+              }
+            }
+EOF
+          fi
+
           npm install
           npx playwright install --with-deps
 
@@ -104,6 +121,6 @@ jobs:
         run: |
           curl -F file=@site-reports.zip \
                -F "initial_comment= Full Site Reports" \
-               -F channels=#new-channel \
+               -F channels=#your-channel-name \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
