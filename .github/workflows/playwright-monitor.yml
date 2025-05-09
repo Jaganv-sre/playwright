@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          npx playwright install chromium  # Install only Chromium
+          npx playwright install chromium
 
       - name: Run Playwright tests for ${{ matrix.site }}
         run: |
@@ -68,6 +68,7 @@ jobs:
   notify:
     needs: site-check
     runs-on: ubuntu-latest
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -87,21 +88,13 @@ jobs:
       - name: Zip all reports
         run: zip -r site-reports.zip all-reports
 
-      - name: Read combined status safely
-        id: read_status
-        run: |
-          if [ -f combined-status.txt ]; then
-            RAW_STATUS=$(cat combined-status.txt)
-            ESCAPED_STATUS=$(printf "%s" "$RAW_STATUS" | jq -Rs .)
-            echo "status_message=$ESCAPED_STATUS" >> $GITHUB_OUTPUT
-          else
-            echo "status_message=\"No site status available.\"" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Send status to Slack
+      - name: Send status to Slack (Fixed Payload)
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          payload: ${{ steps.read_status.outputs.status_message }}
+          payload: |
+            {
+              "text": "📊 *Playwright Site Audit Report*\n\n${{ steps.merge_status.outputs.status_message }}"
+            }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
@@ -110,7 +103,7 @@ jobs:
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
         run: |
           curl -F file=@site-reports.zip \
-               -F "initial_comment=Full Site Reports" \
+               -F "initial_comment=Full Site Reports ZIP attached" \
                -F channels=#new-channel \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
