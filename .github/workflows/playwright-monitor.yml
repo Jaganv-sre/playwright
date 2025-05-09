@@ -2,7 +2,7 @@ name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "0 */3 * * *"
+    - cron: "0 */3 * * *"  # every 3 hours
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU.spec.ts,Ca.spec.ts]
+        site: [AU, Ca]  # removed .spec.ts extension
 
     env:
       NODE_ENV: production
@@ -24,13 +24,13 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: npm ci
-        env:
-          NODE_ENV: development
+      - name: Check Node.js version
+        run: node -v
 
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+      - name: Install dependencies
+        run: |
+          npm install
+          npx playwright install --with-deps
 
       - name: Run Playwright tests for ${{ matrix.site }}
         run: |
@@ -104,6 +104,6 @@ jobs:
         run: |
           curl -F file=@site-reports.zip \
                -F "initial_comment= Full Site Reports" \
-               -F channels=#your-channel-name \
+               -F channels=#new-channel \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
