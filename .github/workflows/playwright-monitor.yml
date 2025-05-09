@@ -82,6 +82,6 @@ jobs:
         run: |
           curl -F file=@site-reports.zip \
                -F "initial_comment=📎 Full report attached" \
-               -F channels=#new-channel \
+               -F channels=#playwright \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
