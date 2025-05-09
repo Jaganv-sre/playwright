@@ -75,26 +75,24 @@ jobs:
         with:
           path: all-reports
 
-      - name: Merge status messages
+      - name: Merge and escape status messages
         id: merge_status
         run: |
           STATUS_FILE="combined-status.txt"
           touch $STATUS_FILE
           find all-reports -type f -name "combined-status.txt" -exec cat {} \; >> $STATUS_FILE
-          echo "status_message<<EOF" >> $GITHUB_OUTPUT
-          cat $STATUS_FILE >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+
+          # Escape text for Slack payload
+          STATUS_ESCAPED=$(jq -Rs . < $STATUS_FILE)
+          echo "{\"text\": \"📊 Playwright Site Audit Report:\n\n\" + $STATUS_ESCAPED}" > slack-payload.json
 
       - name: Zip all reports
         run: zip -r site-reports.zip all-reports
 
-      - name: Send status to Slack (Fixed Payload)
+      - name: Send status to Slack (Safe JSON)
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          payload: |
-            {
-              "text": "📊 *Playwright Site Audit Report*\n\n${{ steps.merge_status.outputs.status_message }}"
-            }
+          payload-file-path: slack-payload.json
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
@@ -103,7 +101,7 @@ jobs:
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
         run: |
           curl -F file=@site-reports.zip \
-               -F "initial_comment=Full Site Reports ZIP attached" \
+               -F "initial_comment=📎 Site Reports Attached" \
                -F channels=#new-channel \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
