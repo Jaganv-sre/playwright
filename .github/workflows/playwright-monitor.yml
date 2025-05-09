@@ -121,6 +121,6 @@ EOF
         run: |
           curl -F file=@site-reports.zip \
                -F "initial_comment= Full Site Reports" \
-               -F channels=#your-channel-name \
+               -F channels=#new-channel \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
