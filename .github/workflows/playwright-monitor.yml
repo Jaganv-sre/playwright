@@ -2,7 +2,7 @@ name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "0 */3 * * *"  # every 3 hours
+    - cron: "0 */3 * * *"  # Every 3 hours
   workflow_dispatch:
 
 jobs:
@@ -26,26 +26,19 @@ jobs:
           node -v
           npm -v
 
-      - name: Install dependencies
+      - name: Create fallback package.json if missing
         run: |
-          echo "Checking if package.json exists..."
           if [ ! -f "package.json" ]; then
-            echo "Creating a minimal package.json"
-            cat <<EOF > package.json
-            {
-              "name": "playwright-monitor",
-              "version": "1.0.0",
-              "scripts": {
-                "test": "playwright test"
-              },
-              "devDependencies": {
-                "@playwright/test": "^1.42.1",
-                "typescript": "^5.3.3"
-              }
-            }
-EOF
+            echo '{' > package.json
+            echo '  "name": "playwright-monitor",' >> package.json
+            echo '  "version": "1.0.0",' >> package.json
+            echo '  "scripts": { "test": "playwright test" },' >> package.json
+            echo '  "devDependencies": { "@playwright/test": "^1.42.1", "typescript": "^5.3.3" }' >> package.json
+            echo '}' >> package.json
           fi
 
+      - name: Install dependencies
+        run: |
           npm install
           npx playwright install --with-deps
 
