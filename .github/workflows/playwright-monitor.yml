@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [ca,au]
+        site: [AU.spec.ts,Ca.spec.ts]
 
     env:
       NODE_ENV: production
