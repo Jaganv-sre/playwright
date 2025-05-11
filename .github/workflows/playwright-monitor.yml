@@ -44,27 +44,27 @@ jobs:
           fi
 
       - name: Upload site report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: report-${{ matrix.site }}
           path: reports/${{ matrix.site }}
 
       - name: Upload site status
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: status-${{ matrix.site }}
           path: reports/${{ matrix.site }}/combined-status.txt
 
       - name: Upload homepage screenshot
         if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: homepage-screenshot
           path: screenshots/homepage.png
 
       - name: Upload homepage performance CSV
         if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: homepage-csv
           path: reports/homepage_performance.csv
@@ -78,13 +78,13 @@ jobs:
     
     steps:
       - name: Download homepage screenshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: homepage-screenshot
           path: reports
 
       - name: Download homepage CSV
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: homepage-csv
           path: reports
@@ -110,13 +110,13 @@ jobs:
         uses: actions/configure-pages@v3
           
       - name: Upload reports to GitHub Pages
-        uses: actions/upload-pages-artifact@v2
+        uses: actions/upload-pages-artifact@v1
         with:
           path: reports/
           
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v1
         
       - name: Post GitHub Pages link to Slack
         uses: slackapi/slack-github-action@v1.24.0
