@@ -87,32 +87,17 @@ jobs:
           zip homepage-report.zip homepage.png homepage_performance.csv
           cd ..
 
-      - name: Send status and file to Slack
+      - name: Send files to Slack
+        id: slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          # For posting a rich message using Block Kit
+          # For uploading file directly via Slack API
           payload: |
             {
-              "text": ":spiral_note_pad: Monthly Playwright Site Status Check",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": ":spiral_note_pad: *Monthly Playwright Site Status Check*\nHomepage Screenshot + CSV Report available as a download."
-                  }
-                }
-              ]
+              "text": ":spiral_note_pad: Monthly Playwright Site Status Check\nHomepage Screenshot + CSV Report available as a download."
             }
+          files: |
+            {"file1": "reports/homepage-report.zip"}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-          
-      - name: Upload file to Slack
-        uses: adrey/slack-file-upload-action@master
-        with:
-          token: ${{ secrets.SLACK_BOT_TOKEN }}
-          path: reports/homepage-report.zip
-          channel: ${{ secrets.SLACK_CHANNEL }}
-          initial_comment: "Monthly Playwright monitor report attached"
-          filetype: "zip"
