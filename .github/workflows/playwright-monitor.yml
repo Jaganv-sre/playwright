@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU, Ca]
+        site: [AU]
 
     steps:
       - name: Checkout code
@@ -66,26 +66,22 @@ jobs:
           echo "✅ Final Merged Status Output:"
           cat full-status.txt
 
-      - name: Zip all reports
-        run: zip -r site-reports.zip all-reports
-
-      - name: Send Slack Message (safe JSON)
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-        run: |
-          ESCAPED=$(jq -Rs . < full-status.txt)
-          echo "{\"text\": $ESCAPED}" > slack-payload.json
-
-          curl -X POST -H 'Content-type: application/json' \
-            --data @slack-payload.json \
-            $SLACK_WEBHOOK_URL
-
-      - name: Upload ZIP file to Slack
+      - name: Upload Homepage Screenshot to Slack
         env:
           SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
         run: |
-          curl -F file=@site-reports.zip \
-               -F "initial_comment=📎 Full report attached" \
-               -F channels=#playwright \
+          curl -F file=@screenshots/homepage.png \
+               -F "initial_comment=🖼️ Homepage Screenshot" \
+               -F channels=#your-channel-name \
+               -H "Authorization: Bearer $SLACK_TOKEN" \
+               https://slack.com/api/files.upload
+
+      - name: Upload CSV Performance Report to Slack
+        env:
+          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
+        run: |
+          curl -F file=@reports/homepage_performance.csv \
+               -F "initial_comment=📊 Performance Report CSV" \
+               -F channels=#your-channel-name \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
