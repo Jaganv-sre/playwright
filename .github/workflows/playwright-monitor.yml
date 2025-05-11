@@ -38,6 +38,18 @@ jobs:
             echo "$SITE_UPPER check failed ❌" > reports/$SITE/combined-status.txt
           fi
 
+      - name: Upload site report
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.site }}
+          path: reports/${{ matrix.site }}
+
+      - name: Upload site status
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
+
       - name: Upload homepage screenshot
         if: matrix.site == 'AU'
         uses: actions/upload-artifact@v4
@@ -73,12 +85,12 @@ jobs:
         run: |
           cd reports
           zip homepage-report.zip homepage.png homepage_performance.csv
+          cd ..
 
       - name: Send ZIP report to Slack
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          slack-message: "🗂️ Homepage Screenshot + CSV Report attached"
-          file-path: reports/homepage-report.zip
+        uses: Ilshidur/action-slack@v2
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        with:
+          args: ":spiral_note_pad: Homepage Screenshot + CSV Report attached"
+          file: reports/homepage-report.zip
