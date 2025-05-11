@@ -98,7 +98,7 @@ jobs:
         run: |
           curl -F file=@screenshots/homepage.png \
                -F "initial_comment=🖼️ Homepage Screenshot" \
-               -F channels=#your-channel-name \
+               -F channels=#playwright \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
 
