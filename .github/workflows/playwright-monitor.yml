@@ -50,15 +50,41 @@ jobs:
           name: status-${{ matrix.site }}
           path: reports/${{ matrix.site }}/combined-status.txt
 
+      - name: Upload homepage screenshot
+        if: matrix.site == 'AU'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-screenshot
+          path: screenshots/homepage.png
+
+      - name: Upload homepage performance CSV
+        if: matrix.site == 'AU'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-csv
+          path: reports/homepage_performance.csv
+
   notify:
     needs: site-check
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all artifacts
+      - name: Download all site artifacts
         uses: actions/download-artifact@v4
         with:
           path: all-reports
+
+      - name: Download homepage screenshot
+        uses: actions/download-artifact@v4
+        with:
+          name: homepage-screenshot
+          path: screenshots
+
+      - name: Download homepage CSV
+        uses: actions/download-artifact@v4
+        with:
+          name: homepage-csv
+          path: reports
 
       - name: Merge status into file
         run: |
@@ -82,6 +108,6 @@ jobs:
         run: |
           curl -F file=@reports/homepage_performance.csv \
                -F "initial_comment=📊 Performance Report CSV" \
-               -F channels=#your-channel-name \
+               -F channels=#playwright \
                -H "Authorization: Bearer $SLACK_TOKEN" \
                https://slack.com/api/files.upload
