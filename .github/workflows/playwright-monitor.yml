@@ -38,18 +38,6 @@ jobs:
             echo "$SITE_UPPER check failed ❌" > reports/$SITE/combined-status.txt
           fi
 
-      - name: Commit homepage screenshot and CSV
-        if: matrix.site == 'AU'
-        run: |
-          mkdir -p public/reports
-          cp screenshots/homepage.png public/reports/
-          cp reports/homepage_performance.csv public/reports/
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          git add public/reports
-          git commit -m "Add homepage report artifacts"
-          git push
-
       - name: Upload site report
         uses: actions/upload-artifact@v4
         with:
@@ -62,43 +50,53 @@ jobs:
           name: status-${{ matrix.site }}
           path: reports/${{ matrix.site }}/combined-status.txt
 
+      - name: Upload homepage screenshot
+        if: matrix.site == 'AU'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-screenshot
+          path: screenshots/homepage.png
+
+      - name: Upload homepage performance CSV
+        if: matrix.site == 'AU'
+        uses: actions/upload-artifact@v4
+        with:
+          name: homepage-csv
+          path: reports/homepage_performance.csv
+
   notify:
     needs: site-check
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send homepage screenshot to Slack
-        uses: slackapi/slack-github-action@v1.24.0
+      - name: Download homepage screenshot
+        uses: actions/download-artifact@v4
         with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          slack-message: |
-            {
-              "text": "🖼️ Homepage Screenshot",
-              "attachments": [
-                {
-                  "fallback": "Homepage Screenshot",
-                  "image_url": "https://github.com/Jaganv-sre/playwright.git/main/public/reports/homepage.png"
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          name: homepage-screenshot
+          path: reports
 
-      - name: Send homepage CSV to Slack
+      - name: Download homepage CSV
+        uses: actions/download-artifact@v4
+        with:
+          name: homepage-csv
+          path: reports
+
+      - name: Zip screenshot and CSV
+        run: |
+          cd reports
+          zip homepage-report.zip homepage.png homepage_performance.csv
+          cd ..
+
+      - name: Send ZIP report to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
           channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          slack-message: |
-            {
-              "text": "📊 Homepage Performance CSV",
-              "attachments": [
-                {
-                  "fallback": "Performance CSV available",
-                  "title": "View Homepage CSV",
-                  "title_link": "https://github.com/Jaganv-sre/playwright.git/public/reports/homepage_performance.csv",
-                  "color": "#36a64f"
-                }
-              ]
-            }
+          payload-file-path: slack-payload.json
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+        run: |
+          jq -n --arg channel "${{ secrets.SLACK_CHANNEL_ID }}" --arg filename "reports/homepage-report.zip" '{
+            "channel": $channel,
+            "initial_comment": "🗂️ Homepage Screenshot + CSV Report",
+            "filename": $filename
+          }' > slack-payload.json
