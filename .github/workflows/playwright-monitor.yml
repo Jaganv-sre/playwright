@@ -92,20 +92,26 @@ jobs:
           echo "✅ Final Merged Status Output:"
           cat full-status.txt
 
-      - name: Upload Screenshot to Slack
-        uses: meowcorp/upload-to-slack@v1
+      - name: Send homepage screenshot to Slack
+        uses: slackapi/slack-github-action@v1.24.0
         with:
-          file: screenshots/homepage.png
-          channels: playwright
-          initial_comment: "🖼️ Homepage Screenshot"
+          payload: |
+            {
+              "channel": "playwright",
+              "text": "🖼️ Homepage Screenshot"
+            }
+          files: screenshots/homepage.png
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
-      - name: Upload CSV to Slack
-        uses: meowcorp/upload-to-slack@v1
+      - name: Send homepage CSV to Slack
+        uses: slackapi/slack-github-action@v1.24.0
         with:
-          file: reports/homepage_performance.csv
-          channels: playwright
-          initial_comment: "📊 Homepage Performance CSV"
+          payload: |
+            {
+              "channel": "playwright",
+              "text": "📊 Homepage Performance CSV"
+            }
+          files: reports/homepage_performance.csv
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
