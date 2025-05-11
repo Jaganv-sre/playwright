@@ -38,6 +38,18 @@ jobs:
             echo "$SITE_UPPER check failed ❌" > reports/$SITE/combined-status.txt
           fi
 
+      - name: Commit homepage screenshot and CSV
+        if: matrix.site == 'AU'
+        run: |
+          mkdir -p public/reports
+          cp screenshots/homepage.png public/reports/
+          cp reports/homepage_performance.csv public/reports/
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add public/reports
+          git commit -m "Add homepage report artifacts"
+          git push
+
       - name: Upload site report
         uses: actions/upload-artifact@v4
         with:
@@ -50,48 +62,11 @@ jobs:
           name: status-${{ matrix.site }}
           path: reports/${{ matrix.site }}/combined-status.txt
 
-      - name: Upload homepage screenshot
-        if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v4
-        with:
-          name: homepage-screenshot
-          path: screenshots/homepage.png
-
-      - name: Upload homepage performance CSV
-        if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v4
-        with:
-          name: homepage-csv
-          path: reports/homepage_performance.csv
-
   notify:
     needs: site-check
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all site artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all-reports
-
-      - name: Download homepage screenshot
-        uses: actions/download-artifact@v4
-        with:
-          name: homepage-screenshot
-          path: screenshots
-
-      - name: Download homepage CSV
-        uses: actions/download-artifact@v4
-        with:
-          name: homepage-csv
-          path: reports
-
-      - name: Merge status into file
-        run: |
-          find all-reports -type f -name "combined-status.txt" -exec cat {} \; > full-status.txt
-          echo "✅ Final Merged Status Output:"
-          cat full-status.txt
-
       - name: Send homepage screenshot to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
@@ -102,13 +77,12 @@ jobs:
               "attachments": [
                 {
                   "fallback": "Homepage Screenshot",
-                  "image_url": "https://github.com/${{ github.repository }}/raw/${{ github.ref }}/screenshots/homepage.png"
+                  "image_url": "https://github.com/Jaganv-sre/playwright.git/main/public/reports/homepage.png"
                 }
               ]
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
 
       - name: Send homepage CSV to Slack
         uses: slackapi/slack-github-action@v1.24.0
@@ -120,11 +94,11 @@ jobs:
               "attachments": [
                 {
                   "fallback": "Performance CSV available",
-                  "text": "Performance CSV has been uploaded.",
+                  "title": "View Homepage CSV",
+                  "title_link": "https://github.com/Jaganv-sre/playwright.git/public/reports/homepage_performance.csv",
                   "color": "#36a64f"
                 }
               ]
             }
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
