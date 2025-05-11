@@ -5,18 +5,10 @@ on:
     - cron: "0 0 1 * *"
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 jobs:
   site-check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        site: [AU]
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -24,107 +16,38 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: 18
+          node-version: 16
 
       - name: Install dependencies and Chromium only
         run: |
           npm install
           npx playwright install chromium
 
-      - name: Run Playwright tests for ${{ matrix.site }}
+      - name: Run Playwright tests for AU
         run: |
-          SITE=${{ matrix.site }}
-          SITE_UPPER=$(echo "$SITE" | tr '[:lower:]' '[:upper:]')
-          mkdir -p reports/$SITE
+          mkdir -p reports/AU
+          mkdir -p screenshots
 
-          if npx playwright test sites/${SITE}.spec.ts --reporter=html --output=reports/$SITE; then
-            echo "$SITE_UPPER check passed ✅" > reports/$SITE/combined-status.txt
+          if npx playwright test sites/AU.spec.ts --reporter=html --output=reports/AU; then
+            echo "AU check passed ✅" > reports/AU/combined-status.txt
           else
-            echo "$SITE_UPPER check failed ❌" > reports/$SITE/combined-status.txt
+            echo "AU check failed ❌" > reports/AU/combined-status.txt
           fi
 
-      - name: Upload site report
-        uses: actions/upload-artifact@v2
-        with:
-          name: report-${{ matrix.site }}
-          path: reports/${{ matrix.site }}
-
-      - name: Upload site status
-        uses: actions/upload-artifact@v2
-        with:
-          name: status-${{ matrix.site }}
-          path: reports/${{ matrix.site }}/combined-status.txt
-
-      - name: Upload homepage screenshot
-        if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v2
-        with:
-          name: homepage-screenshot
-          path: screenshots/homepage.png
-
-      - name: Upload homepage performance CSV
-        if: matrix.site == 'AU'
-        uses: actions/upload-artifact@v2
-        with:
-          name: homepage-csv
-          path: reports/homepage_performance.csv
-
-  notify:
-    needs: site-check
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    
-    steps:
-      - name: Download homepage screenshot
-        uses: actions/download-artifact@v2
-        with:
-          name: homepage-screenshot
-          path: reports
-
-      - name: Download homepage CSV
-        uses: actions/download-artifact@v2
-        with:
-          name: homepage-csv
-          path: reports
-
-      - name: Zip screenshot and CSV
+      - name: Create ZIP archive of reports
         run: |
-          cd reports
-          zip homepage-report.zip homepage.png homepage_performance.csv
-          cd ..
+          mkdir -p output
+          zip -r output/site-reports.zip reports screenshots
 
-      - name: Send initial message to Slack
-        uses: slackapi/slack-github-action@v1.24.0
+      - name: Send message to Slack
+        run: |
+          curl -X POST \
+          -H 'Content-type: application/json' \
+          --data '{"text":"📊 Monthly Playwright Site Status Check\nSite monitoring complete. Please check GitHub Actions for full reports."}' \
+          ${{ secrets.SLACK_WEBHOOK }}
+
+      - name: Store report as artifact
+        uses: actions/upload-artifact@v1
         with:
-          payload: |
-            {
-              "text": ":spiral_note_pad: Monthly Playwright Site Status Check\nPreparing report download link..."
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
-      
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v2
-          
-      - name: Upload reports to GitHub Pages
-        uses: actions/upload-pages-artifact@v1
-        with:
-          path: reports/
-          
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v1
-        
-      - name: Post GitHub Pages link to Slack
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          payload: |
-            {
-              "text": ":white_check_mark: Report is ready!\n:arrow_down: Download here: ${{ steps.deployment.outputs.page_url }}homepage-report.zip"
-            }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
-          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          name: site-reports
+          path: output/site-reports.zip
