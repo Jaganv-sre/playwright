@@ -99,7 +99,7 @@ jobs:
           channels: playwright
           initial_comment: "🖼️ Homepage Screenshot"
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
 
       - name: Upload CSV to Slack
         uses: meowcorp/upload-to-slack@v1
@@ -108,4 +108,4 @@ jobs:
           channels: playwright
           initial_comment: "📊 Homepage Performance CSV"
         env:
-          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
