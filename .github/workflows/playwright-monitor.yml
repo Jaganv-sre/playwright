@@ -5,6 +5,11 @@ on:
     - cron: "0 0 1 * *"
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   site-check:
     runs-on: ubuntu-latest
@@ -67,7 +72,10 @@ jobs:
   notify:
     needs: site-check
     runs-on: ubuntu-latest
-
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
     steps:
       - name: Download homepage screenshot
         uses: actions/download-artifact@v4
@@ -87,33 +95,35 @@ jobs:
           zip homepage-report.zip homepage.png homepage_performance.csv
           cd ..
 
-      - name: Send message to Slack
+      - name: Send initial message to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          # For posting a simple message
           payload: |
             {
-              "text": ":spiral_note_pad: Monthly Playwright Site Status Check\nHomepage Screenshot + CSV Report available as a download."
+              "text": ":spiral_note_pad: Monthly Playwright Site Status Check\nPreparing report download link..."
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
           
       - name: Upload reports to GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v2
         with:
           path: reports/
           
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v2
         
       - name: Post GitHub Pages link to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
           payload: |
             {
-              "text": "📊 Reports available at: ${{ steps.deployment.outputs.page_url }}homepage-report.zip"
+              "text": ":white_check_mark: Report is ready!\n:arrow_down: Download here: ${{ steps.deployment.outputs.page_url }}homepage-report.zip"
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
