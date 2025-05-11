@@ -87,17 +87,34 @@ jobs:
           zip homepage-report.zip homepage.png homepage_performance.csv
           cd ..
 
-      - name: Send files to Slack
-        id: slack
+      - name: Send message to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          # For uploading file directly via Slack API
+          # For posting a simple message
           payload: |
             {
               "text": ":spiral_note_pad: Monthly Playwright Site Status Check\nHomepage Screenshot + CSV Report available as a download."
             }
-          files: |
-            {"file1": "reports/homepage-report.zip"}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+          
+      - name: Upload reports to GitHub Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: reports/
+          
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1
+        
+      - name: Post GitHub Pages link to Slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "📊 Reports available at: ${{ steps.deployment.outputs.page_url }}homepage-report.zip"
+            }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
