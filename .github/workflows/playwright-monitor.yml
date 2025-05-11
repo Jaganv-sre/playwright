@@ -24,30 +24,28 @@ jobs:
           npx playwright install chromium
 
       - name: Run Playwright tests for AU
+        id: playwright-test
         run: |
-          mkdir -p reports/AU
-          mkdir -p screenshots
-
-          if npx playwright test sites/AU.spec.ts --reporter=html --output=reports/AU; then
-            echo "AU check passed ✅" > reports/AU/combined-status.txt
+          if npx playwright test sites/AU.spec.ts; then
+            echo "status=passed" >> $GITHUB_OUTPUT
+            echo "AU site check passed ✅"
           else
-            echo "AU check failed ❌" > reports/AU/combined-status.txt
+            echo "status=failed" >> $GITHUB_OUTPUT
+            echo "AU site check failed ❌"
           fi
 
-      - name: Create ZIP archive of reports
-        run: |
-          mkdir -p output
-          zip -r output/site-reports.zip reports screenshots
-
-      - name: Send message to Slack
+      - name: Send success notification
+        if: steps.playwright-test.outputs.status == 'passed'
         run: |
           curl -X POST \
           -H 'Content-type: application/json' \
-          --data '{"text":"📊 Monthly Playwright Site Status Check\nSite monitoring complete. Please check GitHub Actions for full reports."}' \
+          --data '{"text":"✅ Site Status Check: *PASSED*\n\nThe AU site is functioning correctly."}' \
           ${{ secrets.SLACK_WEBHOOK }}
 
-      - name: Store report as artifact
-        uses: actions/upload-artifact@v1
-        with:
-          name: site-reports
-          path: output/site-reports.zip
+      - name: Send failure notification
+        if: steps.playwright-test.outputs.status == 'failed'
+        run: |
+          curl -X POST \
+          -H 'Content-type: application/json' \
+          --data '{"text":"❌ Site Status Check: *FAILED*\n\nThe AU site check has failed. Please investigate immediately."}' \
+          ${{ secrets.SLACK_WEBHOOK }}
