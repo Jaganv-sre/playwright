@@ -86,19 +86,15 @@ jobs:
           cd reports
           zip homepage-report.zip homepage.png homepage_performance.csv
           cd ..
-      
-      - name: Create Slack payload JSON
-        run: |
-          echo '{
-            "channel": "'"${{ secrets.SLACK_CHANNEL_ID }}"'",
-            "initial_comment": "🗂️ Homepage Screenshot + CSV Report",
-            "filename": "reports/homepage-report.zip"
-          }' > slack-payload.json
 
       - name: Send ZIP report to Slack
         uses: slackapi/slack-github-action@v1.24.0
         with:
-          payload-file-path: slack-payload.json
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          slack-message: |
+            {
+              "text": "🗂️ Homepage Screenshot + CSV Report"
+            }
+          payload-file-path: reports/homepage-report.zip
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
-
