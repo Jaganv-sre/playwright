@@ -92,22 +92,20 @@ jobs:
           echo "✅ Final Merged Status Output:"
           cat full-status.txt
 
-      - name: Upload Homepage Screenshot to Slack
+      - name: Upload Screenshot to Slack
+        uses: meowcorp/upload-to-slack@v1
+        with:
+          file: screenshots/homepage.png
+          channels: playwright
+          initial_comment: "🖼️ Homepage Screenshot"
         env:
-          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-        run: |
-          curl -F file=@screenshots/homepage.png \
-               -F "initial_comment=🖼️ Homepage Screenshot" \
-               -F channels=#playwright \
-               -H "Authorization: Bearer $SLACK_TOKEN" \
-               https://slack.com/api/files.upload
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
 
-      - name: Upload CSV Performance Report to Slack
+      - name: Upload CSV to Slack
+        uses: meowcorp/upload-to-slack@v1
+        with:
+          file: reports/homepage_performance.csv
+          channels: playwright
+          initial_comment: "📊 Homepage Performance CSV"
         env:
-          SLACK_TOKEN: ${{ secrets.SLACK_TOKEN }}
-        run: |
-          curl -F file=@reports/homepage_performance.csv \
-               -F "initial_comment=📊 Performance Report CSV" \
-               -F channels=#playwright \
-               -H "Authorization: Bearer $SLACK_TOKEN" \
-               https://slack.com/api/files.upload
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_TOKEN }}
