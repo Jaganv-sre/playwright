@@ -5,9 +5,11 @@ import path from 'path';
 test.setTimeout(360000); // 6 minutes
 
 const screenshotsDir = './screenshots';
-const performanceLogPath = './performance-metrics.json';
+const reportsDir = './reports';
+const performanceCsvPath = path.join(reportsDir, 'performance-metrics.csv');
 
 if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
 
 const pages = [
   {
@@ -18,17 +20,17 @@ const pages = [
   {
     title: 'Investing',
     url: 'https://www.forbes.com/advisor/au/investing/',
-    h1: 'How To Invest'
+    h1: 'Investing in Australia'
   },
   {
     title: 'Credit Cards',
     url: 'https://www.forbes.com/advisor/au/credit-cards/best-credit-cards/',
-    h1: 'Our Pick Of The Best Credit Cards For Australians'
+    h1: 'Best Credit Cards Australia'
   },
   {
-    title: 'SuperFunds',
-    url: 'https://www.forbes.com/advisor/au/superannuation/best-default-superannuation-funds-in-australia/',
-    h1: 'Our Pick Of The Best Default Superannuation Funds In 2025'
+    title: 'Loans',
+    url: 'https://www.forbes.com/advisor/au/personal-loans/best-personal-loans/',
+    h1: 'Best Personal Loans Australia'
   }
 ];
 
@@ -36,9 +38,10 @@ async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-test('Delayed audit of Forbes AU pages with performance tracking', async ({ page }) => {
-  const performanceData: any[] = [];
+// Write CSV header
+fs.writeFileSync(performanceCsvPath, 'Page,URL,LoadTime(ms),TopSlowResources\n');
 
+test('Delayed audit of Forbes AU pages with performance CSV', async ({ page }) => {
   for (let i = 0; i < pages.length; i++) {
     const { url, title } = pages[i];
     const screenshotPath = path.join(screenshotsDir, `${title.toLowerCase().replace(/ /g, '-')}.png`);
@@ -73,14 +76,13 @@ test('Delayed audit of Forbes AU pages with performance tracking', async ({ page
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.screenshot({ path: screenshotPath, fullPage: true });
 
-      performanceData.push({
-        page: title,
-        url,
-        loadTime,
-        slowestResources: resources
-          .sort((a, b) => b.duration - a.duration)
-          .slice(0, 5)
-      });
+      const topResources = resources
+        .sort((a, b) => b.duration - a.duration)
+        .slice(0, 5)
+        .map(r => `${r.url} (${r.duration}ms)`)
+        .join('; ');
+
+      fs.appendFileSync(performanceCsvPath, `"${title}","${url}",${loadTime},"${topResources}"\n`);
 
       console.log(`✅ ${title} load time: ${loadTime} ms`);
     } catch (err) {
@@ -92,6 +94,4 @@ test('Delayed audit of Forbes AU pages with performance tracking', async ({ page
       await delay(60000);
     }
   }
-
-  fs.writeFileSync(performanceLogPath, JSON.stringify(performanceData, null, 2));
 });
