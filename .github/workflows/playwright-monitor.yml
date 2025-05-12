@@ -75,7 +75,7 @@ jobs:
         run: |
           STATUS=$(cat full-status.txt)
           REPORT_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="🔔 *Site Status Check Summary*\n\n$STATUS\n\n🔗 *View Run:* $REPORT_LINK"
+          MESSAGE="🔔 *Site Status Check Summary*$STATUS🔗 *View Run:* $REPORT_LINK"
 
           PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
           echo "$PAYLOAD" > slack-payload.json
