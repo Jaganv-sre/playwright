@@ -2,7 +2,7 @@ name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "0 0 4 * *"
+    - cron: "0 0 * * FRI"
   workflow_dispatch:
 
 jobs:
@@ -31,7 +31,7 @@ jobs:
           SITE=${{ matrix.site }}
           mkdir -p reports/$SITE
           
-          TEST_FILE="tests/${SITE}_homepage.spec.ts"
+          TEST_FILE="sites/${SITE}.spec.ts"
           
           echo "Running test file: $TEST_FILE"
           
