@@ -5,9 +5,11 @@ import path from 'path';
 test.setTimeout(360000); // 6 minutes
 
 const screenshotsDir = './screenshots';
-const performanceLogPath = './performance-metrics-ca.json';
+const reportsDir = './reports';
+const performanceCsvPath = path.join(reportsDir, 'performance-metrics.csv');
 
 if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
 
 const pages = [
   {
@@ -18,17 +20,17 @@ const pages = [
   {
     title: 'Investing',
     url: 'https://www.forbes.com/advisor/ca/investing/',
-    h1: 'What Is Investing?'
+    h1: 'How To Invest'
   },
   {
     title: 'Credit Cards',
-    url: 'https://www.forbes.com/advisor/ca/credit-cards/',
-    h1: 'Best Credit Cards In Canada For 2024'
+    url: 'https://www.forbes.com/advisor/ca/credit-cards/best-credit-cards/',
+    h1: 'Best Credit Cards in Canada'
   },
   {
-    title: 'Mortgage',
-    url: 'https://www.forbes.com/advisor/ca/mortgages/',
-    h1: 'Best Mortgage Lenders In Canada For May 2024'
+    title: 'Loans',
+    url: 'https://www.forbes.com/advisor/ca/loans/best-personal-loans/',
+    h1: 'Best Personal Loans in Canada'
   }
 ];
 
@@ -36,9 +38,10 @@ async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-test('Delayed audit of Forbes CA pages with performance tracking', async ({ page }) => {
-  const performanceData: any[] = [];
+// Write CSV header
+fs.writeFileSync(performanceCsvPath, 'Page,URL,LoadTime(ms),TopSlowResources\n');
 
+test('Delayed audit of Forbes CA pages with performance CSV', async ({ page }) => {
   for (let i = 0; i < pages.length; i++) {
     const { url, title } = pages[i];
     const screenshotPath = path.join(screenshotsDir, `${title.toLowerCase().replace(/ /g, '-')}.png`);
@@ -73,14 +76,13 @@ test('Delayed audit of Forbes CA pages with performance tracking', async ({ page
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.screenshot({ path: screenshotPath, fullPage: true });
 
-      performanceData.push({
-        page: title,
-        url,
-        loadTime,
-        slowestResources: resources
-          .sort((a, b) => b.duration - a.duration)
-          .slice(0, 5)
-      });
+      const topResources = resources
+        .sort((a, b) => b.duration - a.duration)
+        .slice(0, 5)
+        .map(r => `${r.url} (${r.duration}ms)`)
+        .join('; ');
+
+      fs.appendFileSync(performanceCsvPath, `"${title}","${url}",${loadTime},"${topResources}"\n`);
 
       console.log(`✅ ${title} load time: ${loadTime} ms`);
     } catch (err) {
@@ -92,6 +94,4 @@ test('Delayed audit of Forbes CA pages with performance tracking', async ({ page
       await delay(60000);
     }
   }
-
-  fs.writeFileSync(performanceLogPath, JSON.stringify(performanceData, null, 2));
 });
