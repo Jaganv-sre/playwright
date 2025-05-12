@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU]
+        site: [AU, CA]
 
     steps:
       - name: Checkout code
@@ -30,11 +30,11 @@ jobs:
         run: |
           SITE=${{ matrix.site }}
           mkdir -p reports/$SITE
-          
+
           TEST_FILE="sites/${SITE}.spec.ts"
-          
+
           echo "Running test file: $TEST_FILE"
-          
+
           if npx playwright test "$TEST_FILE" --reporter=html --output=reports/$SITE; then
             echo "$SITE ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
@@ -45,7 +45,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: report-${{ matrix.site }}
-          path: reports/${{ matrix.site }}
+          path: |
+            reports/${{ matrix.site }}
+            screenshots/
+            performance-metrics*.json
 
       - name: Upload site status
         uses: actions/upload-artifact@v4
