@@ -1,4 +1,4 @@
-name: Playwright AU Site Performance Audit
+name: Playwright Site Status
 
 on:
   schedule:
@@ -11,13 +11,13 @@ jobs:
     strategy:
       matrix:
         site: [AU]
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
@@ -26,53 +26,55 @@ jobs:
           npm install
           npx playwright install chromium
 
-      - name: Run Playwright tests for AU
-        id: playwright-test
+      - name: Run Playwright tests for ${{ matrix.site }}
         run: |
-          mkdir -p screenshots
-          if npx playwright test tests/AU_homepage.spec.ts; then
-            echo "status=passed" >> $GITHUB_OUTPUT
-            echo "AU site check passed ✅"
+          SITE=${{ matrix.site }}
+          mkdir -p reports/$SITE
+          if npx playwright test tests/${SITE}_homepage.spec.ts --reporter=html --output=reports/$SITE; then
+            echo "$SITE ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
-            echo "status=failed" >> $GITHUB_OUTPUT
-            echo "AU site check failed ❌"
+            echo "$SITE ❌ Site check failed" > reports/$SITE/combined-status.txt
           fi
 
-      - name: Send success notification to Slack
-        if: steps.playwright-test.outputs.status == 'passed'
+      - name: Upload site report (optional for GitHub artifacts)
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-${{ matrix.site }}
+          path: reports/${{ matrix.site }}
+
+      - name: Upload site status
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
+
+  notify:
+    needs: site-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all status artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+
+      - name: Merge site statuses
         run: |
-          PERFORMANCE_FILE="performance-metrics.json"
-          MESSAGE="✅ Site Status Check: *PASSED*\n🌐 Playwright Report: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n"
+          find all-reports -type f -name "combined-status.txt" -exec cat {} \; > full-status.txt
+          echo "✅ Merged site status:"
+          cat full-status.txt
 
-          if [ -f "$PERFORMANCE_FILE" ]; then
-            while read -r line; do
-              if [[ "$line" == *"page"* ]]; then
-                PAGE=$(echo "$line" | cut -d'"' -f4)
-                MESSAGE+="*📄 $PAGE Page*\n"
-              elif [[ "$line" == *"loadTime"* ]]; then
-                LOAD_TIME=$(echo "$line" | grep -o '[0-9]\+')
-                MESSAGE+="  ⏱ Load Time: ${LOAD_TIME} ms\n"
-              elif [[ "$line" == *"url"* ]]; then
-                URL=$(echo "$line" | cut -d'"' -f4)
-                MESSAGE+="    • $URL\n"
-              elif [[ "$line" == *"duration"* ]]; then
-                DURATION=$(echo "$line" | grep -o '[0-9]\+')
-                MESSAGE+="      └ Duration: ${DURATION} ms\n"
-              fi
-            done < "$PERFORMANCE_FILE"
-          else
-            MESSAGE+="⚠️ Performance report not found."
-          fi
-
-          curl -X POST \
-          -H 'Content-type: application/json' \
-          --data "{\"text\":\"${MESSAGE}\"}" \
-          ${{ secrets.SLACK_WEBHOOK }}
-
-      - name: Send failure notification to Slack
-        if: steps.playwright-test.outputs.status == 'failed'
+      - name: Send Slack Notification (status only)
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          curl -X POST \
-          -H 'Content-type: application/json' \
-          --data '{"text":"❌ Site Status Check: *FAILED*\n\nThe AU site check has failed. Please investigate.\n🔗 Run logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
-          ${{ secrets.SLACK_WEBHOOK }}
+          STATUS=$(cat full-status.txt)
+          REPORT_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          MESSAGE="🔔 *Site Status Check Summary*\n\n$STATUS\n\n🔗 *View Report:* $REPORT_LINK"
+
+          PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
+          echo "$PAYLOAD" > slack-payload.json
+
+          curl -X POST -H 'Content-type: application/json' \
+            --data @slack-payload.json \
+            $SLACK_WEBHOOK_URL
