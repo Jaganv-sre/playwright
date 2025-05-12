@@ -46,9 +46,8 @@ jobs:
         with:
           name: report-${{ matrix.site }}
           path: |
-            reports/${{ matrix.site }}
             screenshots/
-            performance-metrics*.json
+            reports/performance-metrics.csv
 
       - name: Upload site status
         uses: actions/upload-artifact@v4
@@ -70,7 +69,6 @@ jobs:
         run: |
           echo ":bell: *Site Status Check Summary*" > final-status.txt
           
-          # Only loop through status-* folders once
           for dir in status-reports/status-*; do
             cat "$dir/combined-status.txt" >> final-status.txt
           done
