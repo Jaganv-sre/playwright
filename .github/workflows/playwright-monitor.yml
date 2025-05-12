@@ -8,6 +8,9 @@ on:
 jobs:
   site-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site: [AU]
     
     steps:
       - name: Checkout code
