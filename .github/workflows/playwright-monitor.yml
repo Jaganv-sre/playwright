@@ -1,4 +1,4 @@
-name: Playwright Site Status
+name: Playwright AU Site Performance Audit
 
 on:
   schedule:
@@ -16,7 +16,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: 16
+          node-version: 18
 
       - name: Install dependencies and Chromium only
         run: |
@@ -26,7 +26,8 @@ jobs:
       - name: Run Playwright tests for AU
         id: playwright-test
         run: |
-          if npx playwright test sites/AU.spec.ts; then
+          mkdir -p screenshots
+          if npx playwright test tests/AU_homepage.spec.ts; then
             echo "status=passed" >> $GITHUB_OUTPUT
             echo "AU site check passed ✅"
           else
@@ -34,18 +35,41 @@ jobs:
             echo "AU site check failed ❌"
           fi
 
-      - name: Send success notification
+      - name: Send success notification to Slack
         if: steps.playwright-test.outputs.status == 'passed'
         run: |
+          PERFORMANCE_FILE="performance-metrics.json"
+          MESSAGE="✅ Site Status Check: *PASSED*\n🌐 Playwright Report: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n"
+
+          if [ -f "$PERFORMANCE_FILE" ]; then
+            while read -r line; do
+              if [[ "$line" == *"page"* ]]; then
+                PAGE=$(echo "$line" | cut -d'"' -f4)
+                MESSAGE+="*📄 $PAGE Page*\n"
+              elif [[ "$line" == *"loadTime"* ]]; then
+                LOAD_TIME=$(echo "$line" | grep -o '[0-9]\+')
+                MESSAGE+="  ⏱ Load Time: ${LOAD_TIME} ms\n"
+              elif [[ "$line" == *"url"* ]]; then
+                URL=$(echo "$line" | cut -d'"' -f4)
+                MESSAGE+="    • $URL\n"
+              elif [[ "$line" == *"duration"* ]]; then
+                DURATION=$(echo "$line" | grep -o '[0-9]\+')
+                MESSAGE+="      └ Duration: ${DURATION} ms\n"
+              fi
+            done < "$PERFORMANCE_FILE"
+          else
+            MESSAGE+="⚠️ Performance report not found."
+          fi
+
           curl -X POST \
           -H 'Content-type: application/json' \
-          --data '{"text":"✅ Site Status Check: *PASSED*\n\nThe AU site is functioning correctly."}' \
+          --data "{\"text\":\"${MESSAGE}\"}" \
           ${{ secrets.SLACK_WEBHOOK }}
 
-      - name: Send failure notification
+      - name: Send failure notification to Slack
         if: steps.playwright-test.outputs.status == 'failed'
         run: |
           curl -X POST \
           -H 'Content-type: application/json' \
-          --data '{"text":"❌ Site Status Check: *FAILED*\n\nThe AU site check has failed. Please investigate immediately."}' \
+          --data '{"text":"❌ Site Status Check: *FAILED*\n\nThe AU site check has failed. Please investigate.\n🔗 Run logs: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"}' \
           ${{ secrets.SLACK_WEBHOOK }}
