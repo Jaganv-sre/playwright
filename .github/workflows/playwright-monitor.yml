@@ -61,20 +61,24 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all status artifacts
+      - name: Download only status artifacts
         uses: actions/download-artifact@v4
         with:
-          path: all-status
+          path: status-reports
 
-      - name: Build Slack message
-        id: slack
+      - name: Merge unique site statuses
         run: |
           echo ":bell: *Site Status Check Summary*" > final-status.txt
-          find all-status -type f -name "combined-status.txt" -exec cat {} \; >> final-status.txt
+          
+          # Only loop through status-* folders once
+          for dir in status-reports/status-*; do
+            cat "$dir/combined-status.txt" >> final-status.txt
+          done
+          
           echo ":link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> final-status.txt
           cat final-status.txt
 
-      - name: Send Slack Notification (status only)
+      - name: Send Slack Notification
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
