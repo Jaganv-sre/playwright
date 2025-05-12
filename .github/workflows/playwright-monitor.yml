@@ -36,9 +36,9 @@ jobs:
           echo "Running test file: $TEST_FILE"
 
           if npx playwright test "$TEST_FILE" --reporter=html --output=reports/$SITE; then
-            echo "$SITE ✅ Site check passed" > reports/$SITE/combined-status.txt
+            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
-            echo "$SITE ❌ Site check failed" > reports/$SITE/combined-status.txt
+            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
           fi
 
       - name: Upload site report
@@ -64,23 +64,22 @@ jobs:
       - name: Download all status artifacts
         uses: actions/download-artifact@v4
         with:
-          path: all-reports
+          path: all-status
 
-      - name: Merge site statuses
+      - name: Build Slack message
+        id: slack
         run: |
-          find all-reports -type f -name "combined-status.txt" -exec cat {} \; > full-status.txt
-          echo "✅ Merged site status:"
-          cat full-status.txt
+          echo ":bell: *Site Status Check Summary*" > final-status.txt
+          find all-status -type f -name "combined-status.txt" -exec cat {} \; >> final-status.txt
+          echo ":link: *View Run:* https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> final-status.txt
+          cat final-status.txt
 
       - name: Send Slack Notification (status only)
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          STATUS=$(cat full-status.txt)
-          REPORT_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="🔔 *Site Status Check Summary*$STATUS🔗 *View Run:* $REPORT_LINK"
-
-          PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
+          TEXT=$(cat final-status.txt)
+          PAYLOAD=$(jq -n --arg text "$TEXT" '{text: $text}')
           echo "$PAYLOAD" > slack-payload.json
 
           curl -X POST -H 'Content-type: application/json' \
