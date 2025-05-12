@@ -30,13 +30,18 @@ jobs:
         run: |
           SITE=${{ matrix.site }}
           mkdir -p reports/$SITE
-          if npx playwright test tests/${SITE}_homepage.spec.ts --reporter=html --output=reports/$SITE; then
+          
+          TEST_FILE="tests/${SITE}_homepage.spec.ts"
+          
+          echo "Running test file: $TEST_FILE"
+          
+          if npx playwright test "$TEST_FILE" --reporter=html --output=reports/$SITE; then
             echo "$SITE ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
             echo "$SITE ❌ Site check failed" > reports/$SITE/combined-status.txt
           fi
 
-      - name: Upload site report (optional for GitHub artifacts)
+      - name: Upload site report
         uses: actions/upload-artifact@v4
         with:
           name: report-${{ matrix.site }}
@@ -70,7 +75,7 @@ jobs:
         run: |
           STATUS=$(cat full-status.txt)
           REPORT_LINK="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MESSAGE="🔔 *Site Status Check Summary*\n\n$STATUS\n\n🔗 *View Report:* $REPORT_LINK"
+          MESSAGE="🔔 *Site Status Check Summary*\n\n$STATUS\n\n🔗 *View Run:* $REPORT_LINK"
 
           PAYLOAD=$(jq -n --arg text "$MESSAGE" '{text: $text}')
           echo "$PAYLOAD" > slack-payload.json
