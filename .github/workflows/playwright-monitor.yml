@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU,CA]
+        site: [AU, CA]
 
     steps:
       - name: Checkout code
@@ -30,50 +30,26 @@ jobs:
         run: |
           SITE=${{ matrix.site }}
           mkdir -p reports/$SITE
-
+          
           TEST_FILE="sites/${SITE}.spec.ts"
           echo "Running test file: $TEST_FILE"
 
           if npx playwright test "$TEST_FILE"; then
-            echo "$SITE ✅ Site check passed" > reports/$SITE/combined-status.txt
+            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
-            echo "$SITE ❌ Site check failed" > reports/$SITE/combined-status.txt
+            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
           fi
 
-      - name: Upload report artifacts
+      - name: Upload screenshots and performance CSV
         uses: actions/upload-artifact@v4
         with:
           name: report-${{ matrix.site }}
-          path: reports/${{ matrix.site }}
+          path: |
+            screenshots/
+            reports/performance-metrics.csv
 
-  send-email:
-    needs: site-check
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - name: Upload site status file
+        uses: actions/upload-artifact@v4
         with:
-          path: all-reports
-
-      - name: Send email via Outlook SMTP
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.office365.com
-          server_port: 587
-          username: ${{ secrets.EMAIL_USER }}
-          password: ${{ secrets.EMAIL_PASS }}
-          subject: Playwright Report Summary
-          to: jaganv@forbesadvisor.com
-          from: Playwright Monitor <${{ secrets.EMAIL_USER }}>
-          body: |
-            Hello,
-
-            Please find attached the latest Playwright test performance metrics for AU, CA, and IT.
-
-            Regards,
-            SRE Team
-          attachments: |
-            all-reports/report-AU/performance-metrics.csv
-            all-reports/report-CA/performance-metrics.csv
-            all-reports/report-IT/performance-metrics.csv
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
