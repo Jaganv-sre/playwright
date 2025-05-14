@@ -34,4 +34,3 @@ export function generateHtmlReport(data, outputPath) {
 
   fs.writeFileSync(outputPath, html);
 }
-
