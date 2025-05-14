@@ -2,7 +2,7 @@ import { test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
-test.setTimeout(360000); // 6 minutes
+test.setTimeout(900000); // 15 minutes
 
 const screenshotsDir = './screenshots';
 const reportsDir = './reports';
@@ -31,6 +31,46 @@ const pages = [
     title: 'Loans',
     url: 'https://www.forbes.com/advisor/au/personal-loans/best-personal-loans/',
     h1: 'Best Personal Loans Australia'
+  },
+  {
+    title: 'Superannuation Funds',
+    url: 'https://www.forbes.com/advisor/au/superannuation/best-default-superannuation-funds-in-australia/',
+    h1: 'Our Pick Of The Best Default Superannuation Funds In 2025'
+  },
+  {
+    title: 'Car Insurance',
+    url: 'https://www.forbes.com/advisor/au/car-insurance/best-comprehensive-car-insurance-providers/',
+    h1: 'Our Pick Of The Best Comprehensive Car Insurance Providers in Australia'
+  },
+  {
+    title: 'Health Insurance',
+    url: 'https://www.forbes.com/advisor/au/health-insurance/best-private-health-insurance-companies/',
+    h1: 'Our Pick Of The Best Private Health Insurance Providers In Australia'
+  },
+  {
+    title: 'Life Insurance',
+    url: 'https://www.forbes.com/advisor/au/life-insurance/best-life-insurance-australia/',
+    h1: 'Our Pick Of The Best Life Insurance Providers For Australians'
+  },
+  {
+    title: 'Pet Insurance',
+    url: 'https://www.forbes.com/advisor/au/pet-insurance/best-pet-insurance-policies-in-australia/',
+    h1: 'Our Pick Of The Best Comprehensive Pet Insurance Policies In Australia'
+  },
+  {
+    title: 'Travel Insurance',
+    url: 'https://www.forbes.com/advisor/au/travel-insurance/best-comprehensive-travel-insurance/',
+    h1: 'Our Pick Of The Best Comprehensive Travel Insurance Providers In Australia'
+  },
+  {
+    title: 'Cryptocurrency',
+    url: 'https://www.forbes.com/advisor/au/investing/cryptocurrency/',
+    h1: 'Investing In Cryptocurrency'
+  },
+  {
+    title: 'Savings Accounts',
+    url: 'https://www.forbes.com/advisor/au/savings/best-high-interest-savings-accounts/',
+    h1: 'https://www.forbes.com/advisor/au/savings/best-high-interest-savings-accounts/'
   }
 ];
 
