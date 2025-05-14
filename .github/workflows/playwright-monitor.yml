@@ -1,4 +1,4 @@
-name: Playwright Site Status
+name: Playwright AU Site Status
 
 on:
   schedule:
@@ -8,10 +8,6 @@ on:
 jobs:
   site-check:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        site: [AU]
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,50 +17,20 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies and Chromium only
+      - name: Install dependencies and Chromium
         run: |
           npm install
           npx playwright install chromium
 
-      - name: Run Playwright tests for ${{ matrix.site }}
+      - name: Run Playwright test for AU
         run: |
-          SITE=${{ matrix.site }}
-          mkdir -p reports/$SITE
-          mkdir -p screenshots
-          
-          TEST_FILE="sites/${SITE}.spec.ts"
-          echo "Running test file: $TEST_FILE"
+          mkdir -p reports/AU
+          npx playwright test sites/AU.spec.ts
 
-          if npx playwright test "$TEST_FILE" --reporter=html --output=playwright-report; then
-            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
-          else
-            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
-          fi
-
-      - name: Generate custom performance HTML report
-        run: |
-          node scripts/generate-html-report.js
-
-      - name: Upload screenshots
+      - name: Upload AU report and screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: au-screenshots
-          path: screenshots/
-
-      - name: Upload performance HTML report
-        uses: actions/upload-artifact@v4
-        with:
-          name: au-performance-html
-          path: reports/performance-report-AU.html
-
-      - name: Upload Playwright HTML report
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-html
-          path: playwright-report
-
-      - name: Upload site status file
-        uses: actions/upload-artifact@v4
-        with:
-          name: status-${{ matrix.site }}
-          path: reports/${{ matrix.site }}/combined-status.txt
+          name: report-AU
+          path: |
+            reports/performance-report-AU.html
+            screenshots/
