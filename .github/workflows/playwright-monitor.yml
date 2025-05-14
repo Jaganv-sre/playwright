@@ -2,7 +2,7 @@ name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "0 0 * * FRI"
+    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        site: [AU, CA]
+        site: [AU]
 
     steps:
       - name: Checkout code
