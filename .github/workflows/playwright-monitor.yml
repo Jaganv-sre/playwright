@@ -1,4 +1,4 @@
-name: Playwright Site Status
+name: Playwright AU Performance Check
 
 on:
   schedule:
@@ -6,11 +6,8 @@ on:
   workflow_dispatch:
 
 jobs:
-  site-check:
+  run-tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        site: [AU]
 
     steps:
       - name: Checkout code
@@ -21,36 +18,31 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies and Chromium only
+      - name: Install dependencies and browser
         run: |
-          npm install
+          npm ci
           npx playwright install chromium
 
-      - name: Run Playwright tests for ${{ matrix.site }}
+      - name: Run Playwright AU Test
         run: |
-          SITE=${{ matrix.site }}
-          mkdir -p reports/$SITE
-          
-          TEST_FILE="sites/${SITE}.spec.ts"
-          echo "Running test file: $TEST_FILE"
+          mkdir -p reports
+          mkdir -p screenshots
+          npx playwright test tests/AU.spec.ts --reporter=html --output=playwright-report
 
-          if npx playwright test "$TEST_FILE" --reporter=html --output=reports/$SITE; then
-            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
-          else
-            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
-          fi
-
-      - name: Upload Playwright HTML report
+      - name: Upload HTML Report
         uses: actions/upload-artifact@v4
         with:
-          name: report-${{ matrix.site }}
-          path: |
-            reports/${{ matrix.site }}
-            screenshots/
-            reports/performance-metrics.csv
+          name: html-report-au
+          path: playwright-report
 
-      - name: Upload site status
+      - name: Upload Screenshots
         uses: actions/upload-artifact@v4
         with:
-          name: status-${{ matrix.site }}
-          path: reports/${{ matrix.site }}/combined-status.txt
+          name: au-screenshots
+          path: screenshots
+
+      - name: Upload Performance CSV
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-csv-au
+          path: reports/performance-metrics.csv
