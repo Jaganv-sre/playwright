@@ -2,7 +2,7 @@ name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "0 */3 * * *"
+    - cron: "45 */2 * * *"  # Every 2 hours 45 minutes
   workflow_dispatch:
 
 jobs:
@@ -34,21 +34,22 @@ jobs:
           TEST_FILE="sites/${SITE}.spec.ts"
           echo "Running test file: $TEST_FILE"
 
-          if npx playwright test "$TEST_FILE"; then
+          if npx playwright test "$TEST_FILE" --reporter=html --output=reports/$SITE; then
             echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
           else
             echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
           fi
 
-      - name: Upload screenshots and performance CSV
+      - name: Upload Playwright HTML report
         uses: actions/upload-artifact@v4
         with:
           name: report-${{ matrix.site }}
           path: |
+            reports/${{ matrix.site }}
             screenshots/
             reports/performance-metrics.csv
 
-      - name: Upload site status file
+      - name: Upload site status
         uses: actions/upload-artifact@v4
         with:
           name: status-${{ matrix.site }}
