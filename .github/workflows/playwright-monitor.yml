@@ -1,13 +1,16 @@
-name: Playwright AU Performance Check
+name: Playwright Site Status
 
 on:
   schedule:
-    - cron: "45 */2 * * *"  # Every 2 hours 45 minutes
+    - cron: "45 */2 * * *"  # Every 2 hours and 45 minutes
   workflow_dispatch:
 
 jobs:
-  run-tests:
+  site-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site: [AU]
 
     steps:
       - name: Checkout code
@@ -18,36 +21,50 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies and browser
+      - name: Install dependencies and Chromium only
         run: |
-          npm ci
+          npm install
           npx playwright install chromium
 
-      - name: Run AU Playwright tests
+      - name: Run Playwright tests for ${{ matrix.site }}
         run: |
-          mkdir -p reports
+          SITE=${{ matrix.site }}
+          mkdir -p reports/$SITE
           mkdir -p screenshots
-          npx playwright test tests/AU.spec.ts --reporter=html --output=playwright-report
+          
+          TEST_FILE="sites/${SITE}.spec.ts"
+          echo "Running test file: $TEST_FILE"
 
-      - name: Generate HTML report from CSV
-        run: node scripts/generate-html-report.js
-        env:
-          SITE: AU
+          if npx playwright test "$TEST_FILE" --reporter=html --output=playwright-report; then
+            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
+          else
+            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
+          fi
 
-      - name: Upload performance HTML report
-        uses: actions/upload-artifact@v4
-        with:
-          name: au-html-report
-          path: reports/performance-report-AU.html
+      - name: Generate custom performance HTML report
+        run: |
+          node scripts/generate-html-report.js
 
       - name: Upload screenshots
         uses: actions/upload-artifact@v4
         with:
           name: au-screenshots
-          path: screenshots
+          path: screenshots/
+
+      - name: Upload performance HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: au-performance-html
+          path: reports/performance-report-AU.html
 
       - name: Upload Playwright HTML report
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-html-report
+          name: playwright-html
           path: playwright-report
+
+      - name: Upload site status file
+        uses: actions/upload-artifact@v4
+        with:
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
