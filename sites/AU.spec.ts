@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 
@@ -70,7 +70,7 @@ const pages = [
   {
     title: 'Savings Accounts',
     url: 'https://www.forbes.com/advisor/au/savings/best-high-interest-savings-accounts/',
-    h1: 'https://www.forbes.com/advisor/au/savings/best-high-interest-savings-accounts/'
+    h1: 'Our Pick Of The Best High-Interest Savings Accounts In Australia'
   }
 ];
 
@@ -83,10 +83,9 @@ fs.writeFileSync(performanceCsvPath, 'Page,URL,LoadTime(ms),TopSlowResources\n')
 
 test('Delayed audit of Forbes AU pages with performance CSV', async ({ page }) => {
   for (let i = 0; i < pages.length; i++) {
-    const { url, title } = pages[i];
+    const { url, title, h1 } = pages[i];
     const screenshotPath = path.join(screenshotsDir, `${title.toLowerCase().replace(/ /g, '-')}.png`);
     const resources: { url: string; duration: number }[] = [];
-
     const requestTimings = new Map<string, number>();
 
     page.on('request', request => {
@@ -105,7 +104,6 @@ test('Delayed audit of Forbes AU pages with performance CSV', async ({ page }) =
     });
 
     try {
-      const startTime = Date.now();
       await page.goto(url, { waitUntil: 'load' });
 
       const loadTime = await page.evaluate(() => {
@@ -115,6 +113,11 @@ test('Delayed audit of Forbes AU pages with performance CSV', async ({ page }) =
 
       await page.setViewportSize({ width: 1280, height: 720 });
       await page.screenshot({ path: screenshotPath, fullPage: true });
+
+      // Optionally verify the h1 content if defined
+      if (h1) {
+        await expect(page.locator('h1')).toContainText(h1);
+      }
 
       const topResources = resources
         .sort((a, b) => b.duration - a.duration)
