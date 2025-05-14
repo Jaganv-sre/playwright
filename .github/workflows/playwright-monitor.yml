@@ -1,13 +1,16 @@
-name: Playwright AU Performance Check
+name: Website check automation
 
 on:
   schedule:
-    - cron: "45 */2 * * *"  # Every 2 hours 45 minutes
+    - cron: "0 */3 * * *"
   workflow_dispatch:
 
 jobs:
-  run-tests:
+  site-check:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        site: [USAT]
 
     steps:
       - name: Checkout code
@@ -18,31 +21,31 @@ jobs:
         with:
           node-version: 18
 
-      - name: Install dependencies and browser
+      - name: Install dependencies and Chromium only
         run: |
-          npm ci
+          npm install
           npx playwright install chromium
-
-      - name: Run Playwright AU Test
+      - name: Run Playwright tests for ${{ matrix.site }}
         run: |
-          mkdir -p reports
-          mkdir -p screenshots
-          npx playwright test tests/AU.spec.ts --reporter=html --output=playwright-report
-
-      - name: Upload HTML Report
+          SITE=${{ matrix.site }}
+          mkdir -p reports/$SITE
+          
+          TEST_FILE="sites/${SITE}.spec.ts"
+          echo "Running test file: $TEST_FILE"
+          if npx playwright test "$TEST_FILE"; then
+            echo "${SITE} ✅ Site check passed" > reports/$SITE/combined-status.txt
+          else
+            echo "${SITE} ❌ Site check failed" > reports/$SITE/combined-status.txt
+          fi
+      - name: Upload screenshots and performance CSV
         uses: actions/upload-artifact@v4
         with:
-          name: html-report-au
-          path: playwright-report
-
-      - name: Upload Screenshots
+          name: report-${{ matrix.site }}
+          path: |
+            screenshots/
+            reports/performance-metrics.csv
+      - name: Upload site status file
         uses: actions/upload-artifact@v4
         with:
-          name: au-screenshots
-          path: screenshots
-
-      - name: Upload Performance CSV
-        uses: actions/upload-artifact@v4
-        with:
-          name: performance-csv-au
-          path: reports/performance-metrics.csv
+          name: status-${{ matrix.site }}
+          path: reports/${{ matrix.site }}/combined-status.txt
