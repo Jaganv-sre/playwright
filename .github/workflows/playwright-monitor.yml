@@ -1,8 +1,6 @@
 name: Playwright AU Site Status
 
 on:
-  schedule:
-    - cron: "45 */2 * * *"  # Every 2 hours and 45 minutes
   workflow_dispatch:
 
 jobs:
