@@ -1,16 +1,17 @@
 import { test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { generateHtmlReport } from '../utils/htmlReportGenerator';
 
 test.setTimeout(900000); // 15 minutes
 
 const screenshotsDir = './screenshots';
 const reportsDir = './reports';
-const htmlReportPath = path.join(reportsDir, 'performance-report-AU.html');
 
 if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
 if (!fs.existsSync(reportsDir)) fs.mkdirSync(reportsDir);
+
+const performanceCsvPath = path.join(reportsDir, 'performance-metrics-au.csv');
+const performanceJsonPath = path.join(reportsDir, 'performance-summary-au.json');
 
 const pages = [
   {
@@ -79,13 +80,22 @@ async function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-test('Delayed audit of Forbes AU pages with HTML report', async ({ page }) => {
-  const allResults: any[] = [];
+// Write CSV header
+fs.writeFileSync(performanceCsvPath, 'Page,URL,LoadTime(ms),TopSlowResources\n');
 
+const performanceSummary: any[] = [];
+
+test('Delayed audit of Forbes AU pages with performance CSV', async ({ page }) => {
   for (let i = 0; i < pages.length; i++) {
-    const { url, title, h1 } = pages[i];
+    if (i > 0) {
+      console.log('⏳ Waiting 60 seconds before next page...');
+      await delay(60000);
+    }
+
+    const { url, title } = pages[i];
     const screenshotPath = path.join(screenshotsDir, `${title.toLowerCase().replace(/ /g, '-')}.png`);
     const resources: { url: string; duration: number }[] = [];
+
     const requestTimings = new Map<string, number>();
 
     page.on('request', request => {
@@ -104,40 +114,40 @@ test('Delayed audit of Forbes AU pages with HTML report', async ({ page }) => {
     });
 
     try {
+      const startTime = Date.now();
       await page.goto(url, { waitUntil: 'load' });
-      await page.setViewportSize({ width: 1280, height: 720 });
-
-      await page.screenshot({ path: screenshotPath, fullPage: true });
-      await page.waitForSelector('h1');
-      await page.locator('h1').waitFor({ timeout: 5000 });
-      await page.locator('h1').isVisible();
-      await page.locator('h1').textContent();
 
       const loadTime = await page.evaluate(() => {
         const timing = window.performance.timing;
         return timing.loadEventEnd - timing.navigationStart;
       });
 
-      allResults.push({
-        page: title,
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+
+      const topResources = resources
+        .sort((a, b) => b.duration - a.duration)
+        .slice(0, 5);
+
+      const topResourcesString = topResources
+        .map(r => `${r.url} (${r.duration}ms)`)
+        .join('; ');
+
+      fs.appendFileSync(performanceCsvPath, `"${title}","${url}",${loadTime},"${topResourcesString}"\n`);
+
+      performanceSummary.push({
+        title,
         url,
         loadTime,
-        screenshot: screenshotPath,
-        topResources: resources
-          .sort((a, b) => b.duration - a.duration)
-          .slice(0, 5)
+        topResources,
+        screenshot: path.relative('.', screenshotPath)
       });
 
       console.log(`✅ ${title} load time: ${loadTime} ms`);
     } catch (err) {
       console.error(`❌ Error visiting ${title}:`, err);
     }
-
-    if (i < pages.length - 1) {
-      console.log('⏳ Waiting 60 seconds...');
-      await delay(60000);
-    }
   }
 
-  generateHtmlReport(allResults, htmlReportPath);
+  fs.writeFileSync(performanceJsonPath, JSON.stringify(performanceSummary, null, 2));
 });
